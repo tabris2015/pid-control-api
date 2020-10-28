@@ -1,7 +1,10 @@
+import json
+import asyncio
 import uvicorn
 from enum import Enum
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, WebSocket
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 
@@ -19,12 +22,28 @@ class ModelName(str, Enum):
 
 
 app = FastAPI()
+templates = Jinja2Templates(directory='templates')
 fake_items_db = [{'item_name': 'ahu'}, {'item_name': 'uha'}, {'item_name': 'asdf'}]
 
 
 @app.get('/')
-async def root():
-    return {'mensaje': 'hola bola'}
+def read_root(request: Request):
+    return templates.TemplateResponse('index.html', {'request': request})
+
+
+@app.websocket('/ws')
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    with open('measurements.json', 'r') as file:
+        measurements = iter(json.loads(file.read()))
+    while True:
+        await asyncio.sleep(0.05)
+        payload = next(measurements)
+        await websocket.send_json(payload)
+
+# @app.get('/')
+# async def root():
+#     return {'mensaje': 'hola bola'}
 
 
 @app.get('/items/')
